@@ -920,8 +920,12 @@
   var testQuerySerializer = defineSystem((world2) => {
     try {
       console.log("Serializing entity with Vector2 component from piped query");
+      console.log(`${vector2Query(world2).length} entities in query`);
       const packet = serializeVector2FromQuery(world2);
-      console.log(`Packet bytes: ${packet.byteLength}`);
+      if (!packet)
+        return console.error("NULL Packet");
+      else
+        console.log(`Packet bytes: ${packet.byteLength}`);
       console.log("Deserializing packet");
       deserializeVector2(world2, packet, DESERIALIZE_MODE.REPLACE);
       console.log("Deserialized packet OK!");
@@ -936,7 +940,7 @@
   var testChangedSerializer = defineSystem((world2) => {
     try {
       console.log("Serializing entity with changed Vector2 component");
-      const packet = serializeChangedVector2([eid2]);
+      const packet = serializeChangedVector2([eid3]);
       console.log(`Packet bytes: ${packet.byteLength}`);
       console.log("Deserializing packet");
       deserializeChangedVector2(world2, packet, DESERIALIZE_MODE.REPLACE);
