@@ -297,7 +297,7 @@
               createShadow(prop, $);
               changedProps.set(prop, $);
             });
-            return p()[$storeFlattened];
+            return c[$storeFlattened];
           }
         }
         if (Object.getOwnPropertySymbols(p).includes($storeFlattened)) {
@@ -352,11 +352,11 @@
           if (!hasComponent(world2, prop[$storeBase](), eid4)) {
             continue;
           }
-          if ($diff) {
+          if ($diff && !prop[$tagStore]) {
             if (ArrayBuffer.isView(prop[eid4])) {
               let dirty = false;
               for (let i2 = 0; i2 < prop[eid4].length; i2++) {
-                if (prop[eid4][i2] !== prop[eid4][$diff][i2]) {
+                if (prop[eid4][i2] !== prop[$diff][eid4][i2]) {
                   dirty = true;
                   break;
                 }
@@ -377,11 +377,11 @@
             const indexType = prop[eid4][$indexType];
             const indexBytes = prop[eid4][$indexBytes];
             const countWhere2 = where;
-            where += 1;
+            where += indexBytes;
             let count2 = 0;
             for (let i2 = 0; i2 < prop[eid4].length; i2++) {
               const value = prop[eid4][i2];
-              if ($diff && prop[eid4][i2] === prop[eid4][$diff][i2]) {
+              if ($diff && prop[eid4][i2] === prop[$diff][eid4][i2]) {
                 continue;
               }
               view[`set${indexType}`](where, i2);
@@ -587,7 +587,7 @@
     const sparseSet = SparseSet();
     const archetypes = [];
     const changed = [];
-    const toRemove = [];
+    const toRemove = SparseSet();
     const entered = [];
     const exited = [];
     const generations = allComponents.map((c) => c.generationId).reduce((a, v) => {
@@ -617,6 +617,7 @@
       components: components2,
       notComponents,
       changedComponents,
+      allComponents,
       masks,
       notMasks,
       hasMasks,
@@ -637,9 +638,9 @@
     for (let eid4 = 0; eid4 < getEntityCursor(); eid4++) {
       if (!world2[$entitySparseSet].has(eid4))
         continue;
-      if (queryCheckEntity(world2, q, eid4)) {
+      const match = queryCheckEntity(world2, q, eid4);
+      if (match)
         queryAddEntity(q, eid4);
-      }
     }
   };
   var diff = (q, clearDiff) => {
@@ -713,7 +714,7 @@
       const qMask = masks[generationId];
       const qNotMask = notMasks[generationId];
       const eMask = world2[$entityMasks][generationId][eid4];
-      if (qNotMask && (eMask & qNotMask) > 0) {
+      if (qNotMask && (eMask & qNotMask) !== 0) {
         return false;
       }
       if (qMask && (eMask & qMask) !== qMask) {
@@ -729,8 +730,10 @@
     q.entered.push(eid4);
   };
   var queryCommitRemovals = (q) => {
-    while (q.toRemove.length) {
-      q.remove(q.toRemove.pop());
+    for (let i = q.toRemove.dense.length - 1; i >= 0; i--) {
+      const eid4 = q.toRemove.dense[i];
+      q.toRemove.remove(eid4);
+      q.remove(eid4);
     }
   };
   var commitRemovals = (world2) => {
@@ -738,9 +741,9 @@
     world2[$dirtyQueries].clear();
   };
   var queryRemoveEntity = (world2, q, eid4) => {
-    if (!q.has(eid4))
+    if (!q.has(eid4) || q.toRemove.has(eid4))
       return;
-    q.toRemove.push(eid4);
+    q.toRemove.add(eid4);
     world2[$dirtyQueries].add(q);
     q.exited.push(eid4);
   };
@@ -766,7 +769,7 @@
     const notQueries = new Set();
     const changedQueries = new Set();
     world2[$queries].forEach((q) => {
-      if (q.components.includes(component)) {
+      if (q.allComponents.includes(component)) {
         queries.add(q);
       }
     });
@@ -803,7 +806,7 @@
       const match = queryCheckEntity(world2, q, eid4);
       if (match)
         queryAddEntity(q, eid4);
-      else
+      if (!match)
         queryRemoveEntity(world2, q, eid4);
     });
     world2[$entityComponents].get(eid4).add(component);
@@ -841,38 +844,11 @@
     world2[$localEntities] = new Map();
     return world2;
   };
-  var defineSystem = (fn1, fn2) => {
-    const update = fn2 !== void 0 ? fn2 : fn1;
-    const create = fn2 !== void 0 ? fn1 : void 0;
-    const init = new Set();
-    const system = (world2, ...args) => {
-      if (create && !init.has(world2)) {
-        create(world2, ...args);
-        init.add(world2);
-      }
-      update(world2, ...args);
-      commitRemovals(world2);
-      return world2;
-    };
-    Object.defineProperty(system, "name", {
-      value: (update.name || "AnonymousSystem") + "_internal",
-      configurable: true
-    });
-    return system;
-  };
-  var pipe = (...fns) => (...args) => {
-    const input = Array.isArray(args[0]) ? args[0] : args;
-    if (!input || input.length === 0)
-      return;
-    fns = Array.isArray(fns[0]) ? fns[0] : fns;
+  var pipe = (...fns) => (input) => {
     let tmp = input;
     for (let i = 0; i < fns.length; i++) {
       const fn = fns[i];
-      if (Array.isArray(tmp)) {
-        tmp = fn(...tmp);
-      } else {
-        tmp = fn(tmp);
-      }
+      tmp = fn(tmp);
     }
     return tmp;
   };
@@ -886,7 +862,7 @@
   var deserializeArray = defineDeserializer([ArrayComponent]);
   var eid = addEntity(world);
   addComponent(world, ArrayComponent, eid);
-  var testArraySerializer = defineSystem((world2) => {
+  var testArraySerializer = (world2) => {
     try {
       console.log("Serializing entity with array component");
       const packet = serializeArray([eid]);
@@ -897,13 +873,13 @@
     } catch (err) {
       console.error(err);
     }
-  });
+  };
   var Vector2Component = defineComponent({ value: [Types.f32, 2] });
   var serializeVector2 = defineSerializer([Vector2Component]);
   var deserializeVector2 = defineDeserializer([Vector2Component]);
   var eid2 = addEntity(world);
   addComponent(world, Vector2Component, eid2);
-  var testVector2Serializer = defineSystem((world2) => {
+  var testVector2Serializer = (world2) => {
     try {
       console.log("Serializing entity with Vector2 component");
       const packet = serializeVector2([eid2]);
@@ -914,10 +890,10 @@
     } catch (err) {
       console.error(err);
     }
-  });
+  };
   var vector2Query = defineQuery([Vector2Component]);
   var serializeVector2FromQuery = pipe(vector2Query, serializeVector2);
-  var testQuerySerializer = defineSystem((world2) => {
+  var testQuerySerializer = (world2) => {
     try {
       console.log("Serializing entity with Vector2 component from piped query");
       console.log(`${vector2Query(world2).length} entities in query`);
@@ -932,12 +908,12 @@
     } catch (err) {
       console.error(err);
     }
-  });
+  };
   var serializeChangedVector2 = defineSerializer([Changed(Vector2Component)]);
   var deserializeChangedVector2 = defineDeserializer([Changed(Vector2Component)]);
   var eid3 = addEntity(world);
   addComponent(world, Vector2Component, eid3);
-  var testChangedSerializer = defineSystem((world2) => {
+  var testChangedSerializer = (world2) => {
     try {
       console.log("Serializing entity with changed Vector2 component");
       const packet = serializeChangedVector2([eid3]);
@@ -948,13 +924,8 @@
     } catch (err) {
       console.error(err);
     }
-  });
-  var pipeline = pipe([
-    testArraySerializer,
-    testVector2Serializer,
-    testQuerySerializer,
-    testChangedSerializer
-  ]);
+  };
+  var pipeline = pipe(testArraySerializer, testVector2Serializer, testQuerySerializer, testChangedSerializer);
   pipeline(world);
 })();
 //# sourceMappingURL=main.js.map
