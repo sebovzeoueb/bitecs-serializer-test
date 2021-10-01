@@ -64,11 +64,12 @@ const testArraySerializer = world => {
       EntityData.variant[eid] = 4
       eids.push(eid)
     }
-    console.log("Serializing multiple entities with all components again")
+    console.log("Serializing multiple entities with all components")
     const packet2 = serializeAll(eids)
     console.log(`Packet bytes: ${packet2.byteLength}`)
     deserializeAll(world, packet2, DESERIALIZE_MODE.REPLACE)
     console.log("Deserialized packet OK!")
+    console.log("Creating multiple entities with all components again")
     eids.length = 0
     eids.push[eid]
     for (let i = 0; i < 10; i++) {
@@ -199,6 +200,18 @@ const testChangedSerializer = world => {
   return world
 }
 
+const testChangedSerializerNoChange = world => {
+  try {
+    console.log("Serializing unchanged entity with changed Vector2 serializer")
+    const packet = serializeChangedVector2([eid3])
+    console.log(`Packet bytes: ${packet.byteLength} (expected 0)`)
+  }
+  catch(err) {
+    console.error(err)
+  }
+  return world
+}
+
 const actualComponentSerializer = defineSerializer(chunkEntityComponents)
 const actualComponentDeserializer = defineDeserializer(chunkEntityComponents)
 
@@ -236,7 +249,10 @@ const pipeline = pipe(
   testVector2Serializer,
   testQuerySerializer,
   testChangedSerializer,
-  testActualComponents
+  testActualComponents,
+  testChangedSerializerNoChange,
+  testChangedSerializerNoChange,
+  testChangedSerializerNoChange
 )
 
 pipeline(world)

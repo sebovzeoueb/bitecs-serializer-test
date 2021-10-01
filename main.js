@@ -351,6 +351,7 @@
         where += 1;
         const countWhere = where;
         where += 4;
+        const rewindWhere = where;
         let count = 0;
         for (let i = 0; i < ents.length; i++) {
           const eid4 = ents[i];
@@ -360,6 +361,7 @@
           view.setUint32(where, eid4);
           where += 4;
           if (prop[$tagStore]) {
+            count++;
             continue;
           }
           if (ArrayBuffer.isView(prop[eid4])) {
@@ -383,9 +385,12 @@
             if (count2 > 0) {
               view[`set${indexType}`](countWhere2, count2);
               count++;
+            } else {
+              where = rewindWhere;
             }
           } else {
             if ($diff && prop[$diff][eid4] !== prop[eid4]) {
+              where = rewindWhere;
               continue;
             }
             const type = prop.constructor.name.replace("Array", "");
@@ -517,7 +522,7 @@
       resizeWorlds(newSize);
       resizeComponents(newSize);
       setSerializationResized(true);
-      console.info(`\u{1F47E} bitECS - resizing all data stores from ${size} to ${size + amount}`);
+      console.info(`\u{1F47E} bitECS - resizing all data stores from ${size} to ${newSize}`);
     }
     const eid4 = removed.length > 0 ? removed.shift() : globalEntityCursor++;
     world2[$entitySparseSet].add(eid4);
@@ -696,9 +701,6 @@
     if (Array.isArray(args[0])) {
       components2 = args[0];
     } else {
-      any = getAnyComponents(args);
-      all = getAllComponents(args);
-      none = getNoneComponents(args);
     }
     if (components2 === void 0 || components2[$componentMap] !== void 0) {
       return (world2) => world2 ? world2[$entityArray] : components2[$entityArray];
@@ -996,11 +998,12 @@
         EntityData2.variant[eid4] = 4;
         eids.push(eid4);
       }
-      console.log("Serializing multiple entities with all components again");
+      console.log("Serializing multiple entities with all components");
       const packet2 = serializeAll(eids);
       console.log(`Packet bytes: ${packet2.byteLength}`);
       deserializeAll(world2, packet2, DESERIALIZE_MODE.REPLACE);
       console.log("Deserialized packet OK!");
+      console.log("Creating multiple entities with all components again");
       eids.length = 0;
       eids.push[eid];
       for (let i = 0; i < 10; i++) {
@@ -1120,6 +1123,16 @@
     }
     return world2;
   };
+  var testChangedSerializerNoChange = (world2) => {
+    try {
+      console.log("Serializing unchanged entity with changed Vector2 serializer");
+      const packet = serializeChangedVector2([eid3]);
+      console.log(`Packet bytes: ${packet.byteLength} (expected 0)`);
+    } catch (err) {
+      console.error(err);
+    }
+    return world2;
+  };
   var actualComponentSerializer = defineSerializer(chunkEntityComponents_default);
   var actualComponentDeserializer = defineDeserializer(chunkEntityComponents_default);
   var testActualComponents = (world2) => {
@@ -1151,7 +1164,7 @@
     }
     return world2;
   };
-  var pipeline = pipe(testArraySerializer, testVector2Serializer, testQuerySerializer, testChangedSerializer, testActualComponents);
+  var pipeline = pipe(testArraySerializer, testVector2Serializer, testQuerySerializer, testChangedSerializer, testActualComponents, testChangedSerializerNoChange, testChangedSerializerNoChange, testChangedSerializerNoChange);
   pipeline(world);
 })();
 //# sourceMappingURL=main.js.map
