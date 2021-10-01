@@ -352,21 +352,6 @@
           if (!hasComponent(world2, prop[$storeBase](), eid4)) {
             continue;
           }
-          if ($diff && !prop[$tagStore]) {
-            if (ArrayBuffer.isView(prop[eid4])) {
-              let dirty = false;
-              for (let i2 = 0; i2 < prop[eid4].length; i2++) {
-                if (prop[eid4][i2] !== prop[$diff][eid4][i2]) {
-                  dirty = true;
-                  break;
-                }
-              }
-              if (dirty)
-                continue;
-            } else if (prop[eid4] === prop[$diff][eid4])
-              continue;
-          }
-          count++;
           view.setUint32(where, eid4);
           where += 4;
           if (prop[$tagStore]) {
@@ -390,16 +375,27 @@
               where += prop[eid4].BYTES_PER_ELEMENT;
               count2++;
             }
-            view[`set${indexType}`](countWhere2, count2);
+            if (count2 > 0) {
+              view[`set${indexType}`](countWhere2, count2);
+              count++;
+            }
           } else {
+            if ($diff && prop[$diff][eid4] !== prop[eid4]) {
+              continue;
+            }
             const type = prop.constructor.name.replace("Array", "");
             view[`set${type}`](where, prop[eid4]);
             where += prop.BYTES_PER_ELEMENT;
             if (prop[$diff])
               prop[$diff][eid4] = prop[eid4];
+            count++;
           }
         }
-        view.setUint32(countWhere, count);
+        if (count > 0) {
+          view.setUint32(countWhere, count);
+        } else {
+          where -= 5;
+        }
       }
       return buffer.slice(0, where);
     };
@@ -424,6 +420,7 @@
         });
       }
       const localEntities = world2[$localEntities];
+      const localEntityLookup = world2[$localEntityLookup];
       const view = new DataView(packet);
       let where = 0;
       while (where < packet.byteLength) {
@@ -443,6 +440,7 @@
             } else {
               const newEid = addEntity(world2);
               localEntities.set(eid4, newEid);
+              localEntityLookup.set(newEid, eid4);
               newEntities.set(eid4, newEid);
               eid4 = newEid;
             }
@@ -502,16 +500,16 @@
   var globalSize = defaultSize;
   var getGlobalSize = () => globalSize;
   var removed = [];
-  var getDefaultSize = () => defaultSize;
   var getEntityCursor = () => globalEntityCursor;
   var eidToWorld = new Map();
   var addEntity = (world2) => {
+    if (globalEntityCursor + 1 >= defaultSize) {
+      console.error(`bitECS - max entities of ${defaultSize} reached, increase with setDefaultSize function.`);
+      return;
+    }
     const eid4 = removed.length > 0 ? removed.shift() : globalEntityCursor++;
     world2[$entitySparseSet].add(eid4);
     eidToWorld.set(eid4, world2);
-    if (globalEntityCursor >= defaultSize) {
-      console.error(`bitECS - max entities of ${defaultSize} reached, increase with setDefaultSize function.`);
-    }
     world2[$notQueries].forEach((q) => {
       const match = queryCheckEntity(world2, q, eid4);
       if (match)
@@ -529,6 +527,8 @@
     removed.push(eid4);
     world2[$entitySparseSet].remove(eid4);
     world2[$entityComponents].delete(eid4);
+    world2[$localEntities].delete(world2[$localEntityLookup].get(eid4));
+    world2[$localEntityLookup].delete(eid4);
     for (let i = 0; i < world2[$entityMasks].length; i++)
       world2[$entityMasks][i][eid4] = 0;
   };
@@ -737,6 +737,8 @@
     }
   };
   var commitRemovals = (world2) => {
+    if (!world2[$dirtyQueries].size)
+      return;
     world2[$dirtyQueries].forEach(queryCommitRemovals);
     world2[$dirtyQueries].clear();
   };
@@ -750,7 +752,7 @@
   var $componentMap = Symbol("componentMap");
   var components = [];
   var defineComponent = (schema) => {
-    const component = createStore(schema, getDefaultSize());
+    const component = createStore(schema, getGlobalSize());
     if (schema && Object.keys(schema).length)
       components.push(component);
     return component;
@@ -781,20 +783,24 @@
       notQueries,
       changedQueries
     });
-    if (component[$storeSize] < world2[$size]) {
-      resizeStore(component, world2[$size]);
+    if (component[$storeSize] < getGlobalSize()) {
+      resizeStore(component, getGlobalSize());
     }
     incrementBitflag(world2);
   };
   var hasComponent = (world2, component, eid4) => {
     const registeredComponent = world2[$componentMap].get(component);
     if (!registeredComponent)
-      return;
+      return false;
     const { generationId, bitflag } = registeredComponent;
     const mask = world2[$entityMasks][generationId][eid4];
     return (mask & bitflag) === bitflag;
   };
   var addComponent = (world2, component, eid4, reset = true) => {
+    if (eid4 === void 0)
+      throw new Error("bitECS - entity is undefined.");
+    if (!world2[$entitySparseSet].has(eid4))
+      throw new Error("bitECS - entity does not exist in the world.");
     if (!world2[$componentMap].has(component))
       registerComponent(world2, component);
     if (hasComponent(world2, component, eid4))
@@ -803,6 +809,8 @@
     const { generationId, bitflag, queries, notQueries } = c;
     world2[$entityMasks][generationId][eid4] |= bitflag;
     queries.forEach((q) => {
+      if (q.toRemove.has(eid4))
+        q.toRemove.remove(eid4);
       const match = queryCheckEntity(world2, q, eid4);
       if (match)
         queryAddEntity(q, eid4);
@@ -818,9 +826,10 @@
   var $bitflag = Symbol("bitflag");
   var $archetypes = Symbol("archetypes");
   var $localEntities = Symbol("localEntities");
+  var $localEntityLookup = Symbol("localEntityLookp");
   var worlds = [];
-  var createWorld = () => {
-    const world2 = {};
+  var createWorld = (obj = {}) => {
+    const world2 = obj;
     resetWorld(world2);
     worlds.push(world2);
     return world2;
@@ -842,6 +851,7 @@
     world2[$notQueries] = new Set();
     world2[$dirtyQueries] = new Set();
     world2[$localEntities] = new Map();
+    world2[$localEntityLookup] = new Map();
     return world2;
   };
   var pipe = (...fns) => (input) => {
@@ -873,6 +883,7 @@
     } catch (err) {
       console.error(err);
     }
+    return world2;
   };
   var Vector2Component = defineComponent({ value: [Types.f32, 2] });
   var serializeVector2 = defineSerializer([Vector2Component]);
@@ -890,6 +901,7 @@
     } catch (err) {
       console.error(err);
     }
+    return world2;
   };
   var vector2Query = defineQuery([Vector2Component]);
   var serializeVector2FromQuery = pipe(vector2Query, serializeVector2);
@@ -908,11 +920,14 @@
     } catch (err) {
       console.error(err);
     }
+    return world2;
   };
   var serializeChangedVector2 = defineSerializer([Changed(Vector2Component)]);
   var deserializeChangedVector2 = defineDeserializer([Changed(Vector2Component)]);
+  var serializeChangedArray = defineSerializer([Changed(ArrayComponent)]);
   var eid3 = addEntity(world);
   addComponent(world, Vector2Component, eid3);
+  addComponent(world, ArrayComponent, eid3);
   var testChangedSerializer = (world2) => {
     try {
       console.log("Serializing entity with changed Vector2 component");
@@ -921,9 +936,29 @@
       console.log("Deserializing packet");
       deserializeChangedVector2(world2, packet, DESERIALIZE_MODE.REPLACE);
       console.log("Deserialized packet OK!");
+      console.log("Serializing entity after no value change");
+      const packet2 = serializeChangedVector2([eid3]);
+      console.log(`Packet bytes: ${packet2.byteLength} (expected 0)`);
+      console.log("Changing component value");
+      Vector2Component.value[eid3][0] = 5;
+      console.log("Serializing entity after value change");
+      const packet3 = serializeChangedVector2([eid3]);
+      console.log(`Packet bytes: ${packet3.byteLength}`);
+      console.log("Serializing entity with changed array component");
+      const packet4 = serializeChangedArray([eid3]);
+      console.log(`Packet bytes: ${packet4.byteLength}`);
+      console.log("Serializing entity after no value change");
+      const packet5 = serializeChangedArray([eid3]);
+      console.log(`Packet bytes: ${packet5.byteLength} (expected 0)`);
+      console.log("Changing component value");
+      ArrayComponent.arr[eid3][6] = 5;
+      console.log("Serializing entity after value change");
+      const packet6 = serializeChangedArray([eid3]);
+      console.log(`Packet bytes: ${packet6.byteLength}`);
     } catch (err) {
       console.error(err);
     }
+    return world2;
   };
   var pipeline = pipe(testArraySerializer, testVector2Serializer, testQuerySerializer, testChangedSerializer);
   pipeline(world);

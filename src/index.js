@@ -7,7 +7,6 @@ const world = createWorld()
 const ArrayComponent = defineComponent({arr: [Types.ui16, 1024]})
 const serializeArray = defineSerializer([ArrayComponent])
 const deserializeArray = defineDeserializer([ArrayComponent])
-
 const eid = addEntity(world)
 addComponent(world, ArrayComponent, eid)
 
@@ -23,6 +22,7 @@ const testArraySerializer = world => {
   catch(err) {
     console.error(err)
   }
+  return world
 }
 
 const Vector2Component = defineComponent({value: [Types.f32, 2]})
@@ -44,6 +44,7 @@ const testVector2Serializer = world => {
   catch(err) {
     console.error(err)
   }
+  return world
 }
 
 const vector2Query = defineQuery([Vector2Component])
@@ -63,13 +64,16 @@ const testQuerySerializer = world => {
   catch(err) {
     console.error(err)
   }
+  return world
 }
 
 const serializeChangedVector2 = defineSerializer([Changed(Vector2Component)])
 const deserializeChangedVector2 = defineDeserializer([Changed(Vector2Component)])
+const serializeChangedArray = defineSerializer([Changed(ArrayComponent)])
 
 const eid3 = addEntity(world)
 addComponent(world, Vector2Component, eid3)
+addComponent(world, ArrayComponent, eid3)
 
 const testChangedSerializer = world => {
   try {
@@ -79,10 +83,30 @@ const testChangedSerializer = world => {
     console.log("Deserializing packet")
     deserializeChangedVector2(world, packet, DESERIALIZE_MODE.REPLACE)
     console.log("Deserialized packet OK!")
+    console.log("Serializing entity after no value change")
+    const packet2 = serializeChangedVector2([eid3])
+    console.log(`Packet bytes: ${packet2.byteLength} (expected 0)`)
+    console.log("Changing component value")
+    Vector2Component.value[eid3][0] = 5
+    console.log("Serializing entity after value change")
+    const packet3 = serializeChangedVector2([eid3])
+    console.log(`Packet bytes: ${packet3.byteLength}`)
+    console.log("Serializing entity with changed array component")
+    const packet4 = serializeChangedArray([eid3])
+    console.log(`Packet bytes: ${packet4.byteLength}`)
+    console.log("Serializing entity after no value change")
+    const packet5 = serializeChangedArray([eid3])
+    console.log(`Packet bytes: ${packet5.byteLength} (expected 0)`)
+    console.log("Changing component value")
+    ArrayComponent.arr[eid3][6] = 5
+    console.log("Serializing entity after value change")
+    const packet6 = serializeChangedArray([eid3])
+    console.log(`Packet bytes: ${packet6.byteLength}`)
   }
   catch(err) {
     console.error(err)
   }
+  return world
 }
 
 const pipeline = pipe(
