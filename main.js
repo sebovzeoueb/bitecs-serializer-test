@@ -85,14 +85,16 @@
     const cursors = metadata[$subarrayCursors];
     let type = store[$storeType];
     const length = store[0].length;
-    const indexType = length <= UNSIGNED_MAX.uint8 ? "ui8" : length <= UNSIGNED_MAX.uint16 ? "ui16" : "ui32";
-    const arrayCount = metadata[$storeArrayCounts][type];
-    const summedLength = Array(arrayCount).fill(0).reduce((a, p) => a + length, 0);
-    const array = new TYPES[type](roundToMultiple4(summedLength * size));
-    array.set(metadata[$storeSubarrays][type]);
-    metadata[$storeSubarrays][type] = array;
-    array[$indexType] = TYPES_NAMES[indexType];
-    array[$indexBytes] = TYPES[indexType].BYTES_PER_ELEMENT;
+    const indexType = length <= UNSIGNED_MAX.uint8 ? TYPES_ENUM.ui8 : length <= UNSIGNED_MAX.uint16 ? TYPES_ENUM.ui16 : TYPES_ENUM.ui32;
+    if (cursors[type] === 0) {
+      const arrayCount = metadata[$storeArrayCounts][type];
+      const summedLength = Array(arrayCount).fill(0).reduce((a, p) => a + length, 0);
+      const array = new TYPES[type](roundToMultiple4(summedLength * size));
+      array.set(metadata[$storeSubarrays][type]);
+      metadata[$storeSubarrays][type] = array;
+      array[$indexType] = TYPES_NAMES[indexType];
+      array[$indexBytes] = TYPES[indexType].BYTES_PER_ELEMENT;
+    }
     const start = cursors[type];
     let end = 0;
     for (let eid4 = 0; eid4 < size; eid4++) {
@@ -156,7 +158,7 @@
     store[$storeType] = type;
     store[$isEidType] = type === TYPES_ENUM.eid;
     const cursors = metadata[$subarrayCursors];
-    const indexType = length < UNSIGNED_MAX.uint8 ? "ui8" : length < UNSIGNED_MAX.uint16 ? "ui16" : "ui32";
+    const indexType = length <= UNSIGNED_MAX.uint8 ? TYPES_ENUM.ui8 : length <= UNSIGNED_MAX.uint16 ? TYPES_ENUM.ui16 : TYPES_ENUM.ui32;
     if (!length)
       throw new Error("bitECS - Must define component array length");
     if (!TYPES[type])
@@ -282,6 +284,9 @@
     MAP: 2
   };
   var resized = false;
+  var setSerializationResized = (v) => {
+    resized = v;
+  };
   var canonicalize = (target) => {
     let componentProps = [];
     let changedProps = new Map();
@@ -498,14 +503,21 @@
   var defaultSize = 1e5;
   var globalEntityCursor = 0;
   var globalSize = defaultSize;
+  var resizeThreshold = () => globalSize - globalSize / 5;
   var getGlobalSize = () => globalSize;
   var removed = [];
   var getEntityCursor = () => globalEntityCursor;
   var eidToWorld = new Map();
   var addEntity = (world2) => {
-    if (globalEntityCursor + 1 >= defaultSize) {
-      console.error(`bitECS - max entities of ${defaultSize} reached, increase with setDefaultSize function.`);
-      return;
+    if (globalEntityCursor >= resizeThreshold()) {
+      const size = globalSize;
+      const amount = Math.ceil(size / 2 / 4) * 4;
+      const newSize = size + amount;
+      globalSize = newSize;
+      resizeWorlds(newSize);
+      resizeComponents(newSize);
+      setSerializationResized(true);
+      console.info(`\u{1F47E} bitECS - resizing all data stores from ${size} to ${size + amount}`);
     }
     const eid4 = removed.length > 0 ? removed.shift() : globalEntityCursor++;
     world2[$entitySparseSet].add(eid4);
@@ -751,6 +763,9 @@
   };
   var $componentMap = Symbol("componentMap");
   var components = [];
+  var resizeComponents = (size) => {
+    components.forEach((component) => resizeStore(component, size));
+  };
   var defineComponent = (schema) => {
     const component = createStore(schema, getGlobalSize());
     if (schema && Object.keys(schema).length)
@@ -828,6 +843,16 @@
   var $localEntities = Symbol("localEntities");
   var $localEntityLookup = Symbol("localEntityLookp");
   var worlds = [];
+  var resizeWorlds = (size) => {
+    worlds.forEach((world2) => {
+      world2[$size] = size;
+      for (let i = 0; i < world2[$entityMasks].length; i++) {
+        const masks = world2[$entityMasks][i];
+        world2[$entityMasks][i] = resize(masks, size);
+      }
+      world2[$resizeThreshold] = world2[$size] - world2[$size] / 5;
+    });
+  };
   var createWorld = (obj = {}) => {
     const world2 = obj;
     resetWorld(world2);
@@ -864,12 +889,66 @@
   };
   var Types = TYPES_ENUM;
 
+  // src/baseTypes.js
+  var Vector2 = { value: [Types.f32, 2] };
+  var Rect = { x: Types.f32, y: Types.f32, width: Types.f32, height: Types.f32 };
+
+  // src/components.js
+  var Position = defineComponent(Vector2);
+  var Direction = defineComponent(Vector2);
+  var Velocity = defineComponent(Vector2);
+  var Speed = defineComponent({ value: Types.f32 });
+  var EntityData = defineComponent({ dataID: Types.ui16, category: Types.ui8, variant: Types.ui8 });
+  var Hitbox = defineComponent(Rect);
+  var Movement = defineComponent({ maxSpeed: Types.f32 });
+  var Action = defineComponent({
+    type: Types.ui8,
+    item: Types.ui16,
+    start: Types.ui32,
+    duration: Types.ui32,
+    trigger: Types.f32,
+    target: [Types.f32, 2]
+  });
+  var PerformingAction = defineComponent();
+  var Chunk = defineComponent({ terrain: [Types.ui16, 1024] });
+  var Loading = defineComponent();
+  var TargetPosition = defineComponent(Vector2);
+  var TilePosition = defineComponent({ x: Types.i32, y: Types.i32 });
+  var StaticEntity = defineComponent();
+  var Door = defineComponent({ locked: Types.ui8 });
+  var Collider = defineComponent();
+  var PlayerCharacter = defineComponent();
+  var Authority = defineComponent();
+  var Inventory = defineComponent({
+    items: [Types.ui16, 30],
+    amounts: [Types.ui16, 30]
+  });
+  var Equipped = defineComponent({ slot: Types.i8 });
+  var Holding = defineComponent({ item: Types.ui16 });
+  var Destroy = defineComponent();
+  var Hitpoints = defineComponent({ current: Types.f32, maximum: Types.f32 });
+
+  // src/staticEntityComponents.js
+  var staticEntityComponents_default = [Position, EntityData, StaticEntity, Door, Collider, Chunk];
+
+  // src/creatureComponents.js
+  var creatureComponents_default = [Position, Direction, Velocity, Movement, EntityData, Hitbox, TargetPosition, Speed, Holding];
+
+  // src/chunkEntityComponents.js
+  var chunkEntityComponents_default = [...new Set([...staticEntityComponents_default, ...creatureComponents_default, Chunk])];
+
   // src/index.js
   console.log("Testing bitECS serializer");
   var world = createWorld();
   var ArrayComponent = defineComponent({ arr: [Types.ui16, 1024] });
   var serializeArray = defineSerializer([ArrayComponent]);
   var deserializeArray = defineDeserializer([ArrayComponent]);
+  var Vector2Component = defineComponent({ value: [Types.f32, 2] });
+  var serializeVector2 = defineSerializer([Vector2Component]);
+  var deserializeVector2 = defineDeserializer([Vector2Component]);
+  var EntityData2 = defineComponent({ dataID: Types.ui16, category: Types.ui8, variant: Types.ui8 });
+  var serializeAll = defineSerializer([ArrayComponent, Vector2Component, EntityData2]);
+  var deserializeAll = defineDeserializer([ArrayComponent, Vector2Component, EntityData2]);
   var eid = addEntity(world);
   addComponent(world, ArrayComponent, eid);
   var testArraySerializer = (world2) => {
@@ -880,14 +959,93 @@
       console.log("Deserializing packet");
       deserializeArray(world2, packet, DESERIALIZE_MODE.REPLACE);
       console.log("Deserialized packet OK!");
+      console.log("Creating multiple entities with all components");
+      const eids = [eid];
+      for (let i = 0; i < 10; i++) {
+        const eid4 = addEntity(world2);
+        addComponent(world2, ArrayComponent, eid4);
+        addComponent(world2, EntityData2, eid4);
+        ArrayComponent.arr[eid4][5] = 3;
+        EntityData2.category[eid4] = 2;
+        EntityData2.dataID[eid4] = 3;
+        EntityData2.variant[eid4] = 1;
+        eids.push(eid4);
+      }
+      for (let i = 0; i < 10; i++) {
+        const eid4 = addEntity(world2);
+        addComponent(world2, Vector2Component, eid4);
+        addComponent(world2, EntityData2, eid4);
+        Vector2Component.value[eid4][1] = 0.8;
+        EntityData2.category[eid4] = 6;
+        EntityData2.dataID[eid4] = 7;
+        EntityData2.variant[eid4] = 3;
+        eids.push(eid4);
+      }
+      for (let i = 0; i < 10; i++) {
+        const eid4 = addEntity(world2);
+        addComponent(world2, Vector2Component, eid4);
+        addComponent(world2, ArrayComponent, eid4);
+        addComponent(world2, EntityData2, eid4);
+        Vector2Component.value[eid4][0] = 0.3;
+        ArrayComponent.arr[eid4][4] = 6;
+        ArrayComponent.arr[eid4][5] = 8;
+        EntityData2.category[eid4] = 19;
+        EntityData2.dataID[eid4] = 3;
+        EntityData2.variant[eid4] = 4;
+        eids.push(eid4);
+      }
+      console.log("Serializing multiple entities with all components again");
+      const packet2 = serializeAll(eids);
+      console.log(`Packet bytes: ${packet2.byteLength}`);
+      deserializeAll(world2, packet2, DESERIALIZE_MODE.REPLACE);
+      console.log("Deserialized packet OK!");
+      eids.length = 0;
+      eids.push[eid];
+      for (let i = 0; i < 10; i++) {
+        const eid4 = addEntity(world2);
+        addComponent(world2, ArrayComponent, eid4);
+        addComponent(world2, EntityData2, eid4);
+        ArrayComponent.arr[eid4][5] = 3;
+        ArrayComponent.arr[eid4][2] = 1;
+        EntityData2.category[eid4] = 2;
+        EntityData2.dataID[eid4] = 3;
+        EntityData2.variant[eid4] = 1;
+        eids.push(eid4);
+      }
+      for (let i = 0; i < 10; i++) {
+        const eid4 = addEntity(world2);
+        addComponent(world2, Vector2Component, eid4);
+        addComponent(world2, EntityData2, eid4);
+        Vector2Component.value[eid4][1] = 0.8;
+        Vector2Component.value[eid4][0] = -0.5;
+        EntityData2.category[eid4] = 6;
+        EntityData2.dataID[eid4] = 7;
+        EntityData2.variant[eid4] = 3;
+        eids.push(eid4);
+      }
+      for (let i = 0; i < 10; i++) {
+        const eid4 = addEntity(world2);
+        addComponent(world2, Vector2Component, eid4);
+        addComponent(world2, ArrayComponent, eid4);
+        addComponent(world2, EntityData2, eid4);
+        Vector2Component.value[eid4][0] = 0.3;
+        ArrayComponent.arr[eid4][4] = 6;
+        ArrayComponent.arr[eid4][5] = 8;
+        EntityData2.category[eid4] = 19;
+        EntityData2.dataID[eid4] = 3;
+        EntityData2.variant[eid4] = 4;
+        eids.push(eid4);
+      }
+      console.log("Serializing multiple entities with all components again");
+      const packet3 = serializeAll(eids);
+      console.log(`Packet bytes: ${packet3.byteLength}`);
+      deserializeAll(world2, packet3, DESERIALIZE_MODE.REPLACE);
+      console.log("Deserialized packet OK!");
     } catch (err) {
       console.error(err);
     }
     return world2;
   };
-  var Vector2Component = defineComponent({ value: [Types.f32, 2] });
-  var serializeVector2 = defineSerializer([Vector2Component]);
-  var deserializeVector2 = defineDeserializer([Vector2Component]);
   var eid2 = addEntity(world);
   addComponent(world, Vector2Component, eid2);
   var testVector2Serializer = (world2) => {
@@ -960,7 +1118,38 @@
     }
     return world2;
   };
-  var pipeline = pipe(testArraySerializer, testVector2Serializer, testQuerySerializer, testChangedSerializer);
+  var actualComponentSerializer = defineSerializer(chunkEntityComponents_default);
+  var actualComponentDeserializer = defineDeserializer(chunkEntityComponents_default);
+  var testActualComponents = (world2) => {
+    try {
+      console.log("Creating chunk entities using actual components from game");
+      const chunkEID = addEntity(world2);
+      addComponent(world2, Chunk, chunkEID);
+      addComponent(world2, Position, chunkEID);
+      const eids = [chunkEID];
+      for (let i = 0; i < 50; i++) {
+        const eid4 = addEntity(world2);
+        addComponent(world2, Position, eid4);
+        addComponent(world2, EntityData2, eid4);
+        addComponent(world2, StaticEntity, eid4);
+        addComponent(world2, Hitpoints, eid4);
+        if (Math.random() < 0.5)
+          addComponent(world2, Collider, eid4);
+        if (Math.random() < 0.5)
+          addComponent(world2, Door, eid4);
+        eids.push(eid4);
+      }
+      console.log("Serializing chunk entities");
+      const packet = actualComponentSerializer(eids);
+      console.log(`Packet bytes: ${packet.byteLength}`);
+      actualComponentDeserializer(world2, packet);
+      console.log("Deserialization OK!");
+    } catch (err) {
+      console.error(err);
+    }
+    return world2;
+  };
+  var pipeline = pipe(testArraySerializer, testVector2Serializer, testQuerySerializer, testChangedSerializer, testActualComponents);
   pipeline(world);
 })();
 //# sourceMappingURL=main.js.map
