@@ -13,8 +13,9 @@ const Vector2Component = defineComponent({value: [Types.f32, 2]})
 const serializeVector2 = defineSerializer([Vector2Component])
 const deserializeVector2 = defineDeserializer([Vector2Component])
 const EntityData = defineComponent({dataID: Types.ui16, category: Types.ui8, variant: Types.ui8})
-const serializeAll = defineSerializer([ArrayComponent, Vector2Component, EntityData])
-const deserializeAll = defineDeserializer([ArrayComponent, Vector2Component, EntityData])
+const TagComponent = defineComponent()
+const serializeAll = defineSerializer([ArrayComponent, Vector2Component, EntityData, TagComponent])
+const deserializeAll = defineDeserializer([ArrayComponent, Vector2Component, EntityData, TagComponent])
 
 const eid = addEntity(world)
 addComponent(world, ArrayComponent, eid)
@@ -33,6 +34,7 @@ const testArraySerializer = world => {
       const eid = addEntity(world)
       addComponent(world, ArrayComponent, eid)
       addComponent(world, EntityData, eid)
+      addComponent(world, TagComponent, eid)
       ArrayComponent.arr[eid][5] = 3
       EntityData.category[eid] = 2
       EntityData.dataID[eid] = 3

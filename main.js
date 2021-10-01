@@ -947,8 +947,9 @@
   var serializeVector2 = defineSerializer([Vector2Component]);
   var deserializeVector2 = defineDeserializer([Vector2Component]);
   var EntityData2 = defineComponent({ dataID: Types.ui16, category: Types.ui8, variant: Types.ui8 });
-  var serializeAll = defineSerializer([ArrayComponent, Vector2Component, EntityData2]);
-  var deserializeAll = defineDeserializer([ArrayComponent, Vector2Component, EntityData2]);
+  var TagComponent = defineComponent();
+  var serializeAll = defineSerializer([ArrayComponent, Vector2Component, EntityData2, TagComponent]);
+  var deserializeAll = defineDeserializer([ArrayComponent, Vector2Component, EntityData2, TagComponent]);
   var eid = addEntity(world);
   addComponent(world, ArrayComponent, eid);
   var testArraySerializer = (world2) => {
@@ -965,6 +966,7 @@
         const eid4 = addEntity(world2);
         addComponent(world2, ArrayComponent, eid4);
         addComponent(world2, EntityData2, eid4);
+        addComponent(world2, TagComponent, eid4);
         ArrayComponent.arr[eid4][5] = 3;
         EntityData2.category[eid4] = 2;
         EntityData2.dataID[eid4] = 3;
