@@ -267,6 +267,25 @@ const testActualComponents = world => {
   return world
 }
 
+const arrEntities = []
+for (let i = 0; i < 10; i++) {
+  const eid = addEntity(world)
+  addComponent(world, ArrayComponent, eid)
+  for (let j = 0; j < 1024; j++) ArrayComponent.arr[eid][j] = j+1
+  arrEntities.push(eid)
+}
+const changedArrayQuery = defineQuery([Changed(ArrayComponent)])
+
+const testChanged = world => {
+  console.log(`${changedArrayQuery(world).length} changed array entities`)
+  console.log(`${changedArrayQuery(world).length} changed array entities in 2nd run`)
+  console.log('Changing a value')
+  ArrayComponent.arr[arrEntities[5]][10] = 5
+  console.log(`${changedArrayQuery(world).length} changed array entities in 3rd run`)
+  console.log(`${changedArrayQuery(world).length} changed array entities in 4th run`)
+  return world
+}
+
 const pipeline = pipe(
   testArraySerializer,
   testVector2Serializer,
@@ -275,7 +294,8 @@ const pipeline = pipe(
   testActualComponents,
   testChangedSerializerNoChange,
   testChangedSerializerNoChange,
-  testChangedSerializerNoChange
+  testChangedSerializerNoChange,
+  testChanged
 )
 
 pipeline(world)
