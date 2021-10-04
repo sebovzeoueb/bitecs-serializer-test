@@ -166,9 +166,14 @@ const eid3 = addEntity(world)
 addComponent(world, Vector2Component, eid3)
 addComponent(world, ArrayComponent, eid3)
 
+const eid4 = addEntity(world)
+addComponent(world, ArrayComponent, eid4)
+for (let i = 0; i < 1024; i++) ArrayComponent.arr[eid4][i] = i+1
+
 const testChangedSerializer = world => {
   try {
-    console.log("Serializing entity with changed Vector2 component")
+    Vector2Component.value[eid3][0] = 3.4
+    console.log("Serializing entity with changed Vector2 serializer")
     const packet = serializeChangedVector2([eid3])
     console.log(`Packet bytes: ${packet.byteLength}`)
     console.log("Deserializing packet")
@@ -178,11 +183,11 @@ const testChangedSerializer = world => {
     const packet2 = serializeChangedVector2([eid3])
     console.log(`Packet bytes: ${packet2.byteLength} (expected 0)`)
     console.log("Changing component value")
-    Vector2Component.value[eid3][0] = 5
+    Vector2Component.value[eid3][1] = 5
     console.log("Serializing entity after value change")
     const packet3 = serializeChangedVector2([eid3])
     console.log(`Packet bytes: ${packet3.byteLength}`)
-    console.log("Serializing entity with changed array component")
+    console.log("Serializing entity with changed array serializer")
     const packet4 = serializeChangedArray([eid3])
     console.log(`Packet bytes: ${packet4.byteLength}`)
     console.log("Serializing entity after no value change")
@@ -193,6 +198,24 @@ const testChangedSerializer = world => {
     console.log("Serializing entity after value change")
     const packet6 = serializeChangedArray([eid3])
     console.log(`Packet bytes: ${packet6.byteLength}`)
+    console.log("Serializing entity after no value change")
+    const packet7 = serializeChangedArray([eid3])
+    console.log(`Packet bytes: ${packet7.byteLength} (expected 0)`)
+    console.log("Serialize filled array")
+    const packet9 = serializeChangedArray([eid4])
+    console.log(`Packet bytes: ${packet9.byteLength}`)
+    console.log("Serialize filled array after no change")
+    const packet10 = serializeChangedArray([eid4])
+    console.log(`Packet bytes: ${packet10.byteLength} (expected 0)`)
+    console.log("Run the serializer a few times for good luck")
+    serializeChangedArray([eid4])
+    serializeChangedArray([eid4])
+    serializeChangedArray([eid4])
+    console.log("Change one value in filled array")
+    ArrayComponent.arr[eid4][66] = 2
+    console.log("Serialize filled array after change along with non changed entity")
+    const packet11 = serializeChangedArray([eid4, eid3])
+    console.log(`Packet bytes: ${packet11.byteLength}`)
   }
   catch(err) {
     console.error(err)

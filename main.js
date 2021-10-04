@@ -72,9 +72,9 @@
   var createShadow = (store, key) => {
     if (!ArrayBuffer.isView(store)) {
       const shadowStore = store[$parentArray].slice(0).fill(0);
-      store[key] = store.map((_, eid4) => {
-        const from = store[eid4][$subarrayFrom];
-        const to = store[eid4][$subarrayTo];
+      store[key] = store.map((_, eid5) => {
+        const from = store[eid5][$subarrayFrom];
+        const to = store[eid5][$subarrayTo];
         return shadowStore.subarray(from, to);
       });
     } else {
@@ -97,15 +97,15 @@
     }
     const start = cursors[type];
     let end = 0;
-    for (let eid4 = 0; eid4 < size; eid4++) {
-      const from = cursors[type] + eid4 * length;
+    for (let eid5 = 0; eid5 < size; eid5++) {
+      const from = cursors[type] + eid5 * length;
       const to = from + length;
-      store[eid4] = metadata[$storeSubarrays][type].subarray(from, to);
-      store[eid4][$subarrayFrom] = from;
-      store[eid4][$subarrayTo] = to;
-      store[eid4][$subarray] = true;
-      store[eid4][$indexType] = TYPES_NAMES[indexType];
-      store[eid4][$indexBytes] = TYPES[indexType].BYTES_PER_ELEMENT;
+      store[eid5] = metadata[$storeSubarrays][type].subarray(from, to);
+      store[eid5][$subarrayFrom] = from;
+      store[eid5][$subarrayTo] = to;
+      store[eid5][$subarray] = true;
+      store[eid5][$indexType] = TYPES_NAMES[indexType];
+      store[eid5][$indexBytes] = TYPES[indexType].BYTES_PER_ELEMENT;
       end = to;
     }
     cursors[type] = end;
@@ -135,13 +135,13 @@
     });
     resizeRecursive(store, store, size);
   };
-  var resetStoreFor = (store, eid4) => {
+  var resetStoreFor = (store, eid5) => {
     if (store[$storeFlattened]) {
       store[$storeFlattened].forEach((ta) => {
         if (ArrayBuffer.isView(ta))
-          ta[eid4] = 0;
+          ta[eid5] = 0;
         else
-          ta[eid4].fill(0);
+          ta[eid5].fill(0);
       });
     }
   };
@@ -173,15 +173,15 @@
     }
     const start = cursors[type];
     let end = 0;
-    for (let eid4 = 0; eid4 < size; eid4++) {
-      const from = cursors[type] + eid4 * length;
+    for (let eid5 = 0; eid5 < size; eid5++) {
+      const from = cursors[type] + eid5 * length;
       const to = from + length;
-      store[eid4] = metadata[$storeSubarrays][type].subarray(from, to);
-      store[eid4][$subarrayFrom] = from;
-      store[eid4][$subarrayTo] = to;
-      store[eid4][$subarray] = true;
-      store[eid4][$indexType] = TYPES_NAMES[indexType];
-      store[eid4][$indexBytes] = TYPES[indexType].BYTES_PER_ELEMENT;
+      store[eid5] = metadata[$storeSubarrays][type].subarray(from, to);
+      store[eid5][$subarrayFrom] = from;
+      store[eid5][$subarrayTo] = to;
+      store[eid5][$subarray] = true;
+      store[eid5][$indexType] = TYPES_NAMES[indexType];
+      store[eid5][$indexBytes] = TYPES[indexType].BYTES_PER_ELEMENT;
       end = to;
     }
     cursors[type] = end;
@@ -351,58 +351,62 @@
         where += 1;
         const countWhere = where;
         where += 4;
-        const rewindWhere = where;
-        let count = 0;
+        let writeCount = 0;
         for (let i = 0; i < ents.length; i++) {
-          const eid4 = ents[i];
-          if (!hasComponent(world2, prop[$storeBase](), eid4)) {
+          const eid5 = ents[i];
+          if (!hasComponent(world2, prop[$storeBase](), eid5)) {
             continue;
           }
-          view.setUint32(where, eid4);
+          const rewindWhere = where;
+          view.setUint32(where, eid5);
           where += 4;
           if (prop[$tagStore]) {
-            count++;
+            writeCount++;
             continue;
           }
-          if (ArrayBuffer.isView(prop[eid4])) {
-            const type = prop[eid4].constructor.name.replace("Array", "");
-            const indexType = prop[eid4][$indexType];
-            const indexBytes = prop[eid4][$indexBytes];
+          if (ArrayBuffer.isView(prop[eid5])) {
+            const type = prop[eid5].constructor.name.replace("Array", "");
+            const indexType = prop[eid5][$indexType];
+            const indexBytes = prop[eid5][$indexBytes];
             const countWhere2 = where;
             where += indexBytes;
-            let count2 = 0;
-            for (let i2 = 0; i2 < prop[eid4].length; i2++) {
-              const value = prop[eid4][i2];
-              if ($diff && prop[eid4][i2] === prop[$diff][eid4][i2]) {
+            let arrayWriteCount = 0;
+            for (let i2 = 0; i2 < prop[eid5].length; i2++) {
+              const value = prop[eid5][i2];
+              if ($diff && prop[eid5][i2] === prop[$diff][eid5][i2]) {
+                prop[$diff][eid5][i2] = prop[eid5][i2];
                 continue;
               }
+              if ($diff)
+                prop[$diff][eid5][i2] = prop[eid5][i2];
               view[`set${indexType}`](where, i2);
               where += indexBytes;
               view[`set${type}`](where, value);
-              where += prop[eid4].BYTES_PER_ELEMENT;
-              count2++;
+              where += prop[eid5].BYTES_PER_ELEMENT;
+              arrayWriteCount++;
             }
-            if (count2 > 0) {
-              view[`set${indexType}`](countWhere2, count2);
-              count++;
+            if (arrayWriteCount > 0) {
+              view[`set${indexType}`](countWhere2, arrayWriteCount);
+              writeCount++;
             } else {
               where = rewindWhere;
             }
           } else {
-            if ($diff && prop[$diff][eid4] !== prop[eid4]) {
+            if ($diff && prop[$diff][eid5] !== prop[eid5]) {
               where = rewindWhere;
+              prop[$diff][eid5] = prop[eid5];
               continue;
             }
+            if ($diff)
+              prop[$diff][eid5] = prop[eid5];
             const type = prop.constructor.name.replace("Array", "");
-            view[`set${type}`](where, prop[eid4]);
+            view[`set${type}`](where, prop[eid5]);
             where += prop.BYTES_PER_ELEMENT;
-            if (prop[$diff])
-              prop[$diff][eid4] = prop[eid4];
-            count++;
+            writeCount++;
           }
         }
-        if (count > 0) {
-          view.setUint32(countWhere, count);
+        if (writeCount > 0) {
+          view.setUint32(countWhere, writeCount);
         } else {
           where -= 5;
         }
@@ -440,35 +444,35 @@
         where += 4;
         const prop = componentProps[pid];
         for (let i = 0; i < entityCount; i++) {
-          let eid4 = view.getUint32(where);
+          let eid5 = view.getUint32(where);
           where += 4;
           if (mode === DESERIALIZE_MODE.MAP) {
-            if (localEntities.has(eid4)) {
-              eid4 = localEntities.get(eid4);
-            } else if (newEntities.has(eid4)) {
-              eid4 = newEntities.get(eid4);
+            if (localEntities.has(eid5)) {
+              eid5 = localEntities.get(eid5);
+            } else if (newEntities.has(eid5)) {
+              eid5 = newEntities.get(eid5);
             } else {
               const newEid = addEntity(world2);
-              localEntities.set(eid4, newEid);
-              localEntityLookup.set(newEid, eid4);
-              newEntities.set(eid4, newEid);
-              eid4 = newEid;
+              localEntities.set(eid5, newEid);
+              localEntityLookup.set(newEid, eid5);
+              newEntities.set(eid5, newEid);
+              eid5 = newEid;
             }
           }
-          if (mode === DESERIALIZE_MODE.APPEND || mode === DESERIALIZE_MODE.REPLACE && !world2[$entitySparseSet].has(eid4)) {
-            const newEid = newEntities.get(eid4) || addEntity(world2);
-            newEntities.set(eid4, newEid);
-            eid4 = newEid;
+          if (mode === DESERIALIZE_MODE.APPEND || mode === DESERIALIZE_MODE.REPLACE && !world2[$entitySparseSet].has(eid5)) {
+            const newEid = newEntities.get(eid5) || addEntity(world2);
+            newEntities.set(eid5, newEid);
+            eid5 = newEid;
           }
           const component = prop[$storeBase]();
-          if (!hasComponent(world2, component, eid4)) {
-            addComponent(world2, component, eid4);
+          if (!hasComponent(world2, component, eid5)) {
+            addComponent(world2, component, eid5);
           }
           if (component[$tagStore]) {
             continue;
           }
-          if (ArrayBuffer.isView(prop[eid4])) {
-            const array = prop[eid4];
+          if (ArrayBuffer.isView(prop[eid5])) {
+            const array = prop[eid5];
             const count = view[`get${array[$indexType]}`](where);
             where += array[$indexBytes];
             for (let i2 = 0; i2 < count; i2++) {
@@ -480,9 +484,9 @@
                 let localEid = localEntities.get(value);
                 if (!world2[$entitySparseSet].has(localEid))
                   localEid = addEntity(world2);
-                prop[eid4][index] = localEid;
+                prop[eid5][index] = localEid;
               } else
-                prop[eid4][index] = value;
+                prop[eid5][index] = value;
             }
           } else {
             const value = view[`get${prop.constructor.name.replace("Array", "")}`](where);
@@ -491,9 +495,9 @@
               let localEid = localEntities.get(value);
               if (!world2[$entitySparseSet].has(localEid))
                 localEid = addEntity(world2);
-              prop[eid4] = localEid;
+              prop[eid5] = localEid;
             } else
-              prop[eid4] = value;
+              prop[eid5] = value;
           }
         }
       }
@@ -524,30 +528,30 @@
       setSerializationResized(true);
       console.info(`\u{1F47E} bitECS - resizing all data stores from ${size} to ${newSize}`);
     }
-    const eid4 = removed.length > 0 ? removed.shift() : globalEntityCursor++;
-    world2[$entitySparseSet].add(eid4);
-    eidToWorld.set(eid4, world2);
+    const eid5 = removed.length > 0 ? removed.shift() : globalEntityCursor++;
+    world2[$entitySparseSet].add(eid5);
+    eidToWorld.set(eid5, world2);
     world2[$notQueries].forEach((q) => {
-      const match = queryCheckEntity(world2, q, eid4);
+      const match = queryCheckEntity(world2, q, eid5);
       if (match)
-        queryAddEntity(q, eid4);
+        queryAddEntity(q, eid5);
     });
-    world2[$entityComponents].set(eid4, new Set());
-    return eid4;
+    world2[$entityComponents].set(eid5, new Set());
+    return eid5;
   };
-  var removeEntity = (world2, eid4) => {
-    if (!world2[$entitySparseSet].has(eid4))
+  var removeEntity = (world2, eid5) => {
+    if (!world2[$entitySparseSet].has(eid5))
       return;
     world2[$queries].forEach((q) => {
-      queryRemoveEntity(world2, q, eid4);
+      queryRemoveEntity(world2, q, eid5);
     });
-    removed.push(eid4);
-    world2[$entitySparseSet].remove(eid4);
-    world2[$entityComponents].delete(eid4);
-    world2[$localEntities].delete(world2[$localEntityLookup].get(eid4));
-    world2[$localEntityLookup].delete(eid4);
+    removed.push(eid5);
+    world2[$entitySparseSet].remove(eid5);
+    world2[$entityComponents].delete(eid5);
+    world2[$localEntities].delete(world2[$localEntityLookup].get(eid5));
+    world2[$localEntityLookup].delete(eid5);
     for (let i = 0; i < world2[$entityMasks].length; i++)
-      world2[$entityMasks][i][eid4] = 0;
+      world2[$entityMasks][i][eid5] = 0;
   };
   function Changed(c) {
     return () => [c, "changed"];
@@ -652,12 +656,12 @@
     });
     if (notComponents.length)
       world2[$notQueries].add(q);
-    for (let eid4 = 0; eid4 < getEntityCursor(); eid4++) {
-      if (!world2[$entitySparseSet].has(eid4))
+    for (let eid5 = 0; eid5 < getEntityCursor(); eid5++) {
+      if (!world2[$entitySparseSet].has(eid5))
         continue;
-      const match = queryCheckEntity(world2, q, eid4);
+      const match = queryCheckEntity(world2, q, eid5);
       if (match)
-        queryAddEntity(q, eid4);
+        queryAddEntity(q, eid5);
     }
   };
   var diff = (q, clearDiff) => {
@@ -665,28 +669,28 @@
       q.changed = [];
     const { flatProps, shadows } = q;
     for (let i = 0; i < q.dense.length; i++) {
-      const eid4 = q.dense[i];
+      const eid5 = q.dense[i];
       let dirty = false;
       for (let pid = 0; pid < flatProps.length; pid++) {
         const prop = flatProps[pid];
         const shadow = shadows[pid];
-        if (ArrayBuffer.isView(prop[eid4])) {
-          for (let i2 = 0; i2 < prop[eid4].length; i2++) {
-            if (prop[eid4][i2] !== shadow[eid4][i2]) {
+        if (ArrayBuffer.isView(prop[eid5])) {
+          for (let i2 = 0; i2 < prop[eid5].length; i2++) {
+            if (prop[eid5][i2] !== shadow[eid5][i2]) {
               dirty = true;
-              shadow[eid4][i2] = prop[eid4][i2];
+              shadow[eid5][i2] = prop[eid5][i2];
               break;
             }
           }
         } else {
-          if (prop[eid4] !== shadow[eid4]) {
+          if (prop[eid5] !== shadow[eid5]) {
             dirty = true;
-            shadow[eid4] = prop[eid4];
+            shadow[eid5] = prop[eid5];
           }
         }
       }
       if (dirty)
-        q.changed.push(eid4);
+        q.changed.push(eid5);
     }
     return q.changed;
   };
@@ -720,14 +724,14 @@
     query[$queryNone] = none;
     return query;
   };
-  var queryCheckEntity = (world2, q, eid4) => {
+  var queryCheckEntity = (world2, q, eid5) => {
     const { masks, notMasks, generations } = q;
     let or = 0;
     for (let i = 0; i < generations.length; i++) {
       const generationId = generations[i];
       const qMask = masks[generationId];
       const qNotMask = notMasks[generationId];
-      const eMask = world2[$entityMasks][generationId][eid4];
+      const eMask = world2[$entityMasks][generationId][eid5];
       if (qNotMask && (eMask & qNotMask) !== 0) {
         return false;
       }
@@ -737,17 +741,17 @@
     }
     return true;
   };
-  var queryAddEntity = (q, eid4) => {
-    if (q.has(eid4))
+  var queryAddEntity = (q, eid5) => {
+    if (q.has(eid5))
       return;
-    q.add(eid4);
-    q.entered.push(eid4);
+    q.add(eid5);
+    q.entered.push(eid5);
   };
   var queryCommitRemovals = (q) => {
     for (let i = q.toRemove.dense.length - 1; i >= 0; i--) {
-      const eid4 = q.toRemove.dense[i];
-      q.toRemove.remove(eid4);
-      q.remove(eid4);
+      const eid5 = q.toRemove.dense[i];
+      q.toRemove.remove(eid5);
+      q.remove(eid5);
     }
   };
   var commitRemovals = (world2) => {
@@ -756,12 +760,12 @@
     world2[$dirtyQueries].forEach(queryCommitRemovals);
     world2[$dirtyQueries].clear();
   };
-  var queryRemoveEntity = (world2, q, eid4) => {
-    if (!q.has(eid4) || q.toRemove.has(eid4))
+  var queryRemoveEntity = (world2, q, eid5) => {
+    if (!q.has(eid5) || q.toRemove.has(eid5))
       return;
-    q.toRemove.add(eid4);
+    q.toRemove.add(eid5);
     world2[$dirtyQueries].add(q);
-    q.exited.push(eid4);
+    q.exited.push(eid5);
   };
   var $componentMap = Symbol("componentMap");
   var components = [];
@@ -805,38 +809,38 @@
     }
     incrementBitflag(world2);
   };
-  var hasComponent = (world2, component, eid4) => {
+  var hasComponent = (world2, component, eid5) => {
     const registeredComponent = world2[$componentMap].get(component);
     if (!registeredComponent)
       return false;
     const { generationId, bitflag } = registeredComponent;
-    const mask = world2[$entityMasks][generationId][eid4];
+    const mask = world2[$entityMasks][generationId][eid5];
     return (mask & bitflag) === bitflag;
   };
-  var addComponent = (world2, component, eid4, reset = true) => {
-    if (eid4 === void 0)
+  var addComponent = (world2, component, eid5, reset = true) => {
+    if (eid5 === void 0)
       throw new Error("bitECS - entity is undefined.");
-    if (!world2[$entitySparseSet].has(eid4))
+    if (!world2[$entitySparseSet].has(eid5))
       throw new Error("bitECS - entity does not exist in the world.");
     if (!world2[$componentMap].has(component))
       registerComponent(world2, component);
-    if (hasComponent(world2, component, eid4))
+    if (hasComponent(world2, component, eid5))
       return;
     const c = world2[$componentMap].get(component);
     const { generationId, bitflag, queries, notQueries } = c;
-    world2[$entityMasks][generationId][eid4] |= bitflag;
+    world2[$entityMasks][generationId][eid5] |= bitflag;
     queries.forEach((q) => {
-      if (q.toRemove.has(eid4))
-        q.toRemove.remove(eid4);
-      const match = queryCheckEntity(world2, q, eid4);
+      if (q.toRemove.has(eid5))
+        q.toRemove.remove(eid5);
+      const match = queryCheckEntity(world2, q, eid5);
       if (match)
-        queryAddEntity(q, eid4);
+        queryAddEntity(q, eid5);
       if (!match)
-        queryRemoveEntity(world2, q, eid4);
+        queryRemoveEntity(world2, q, eid5);
     });
-    world2[$entityComponents].get(eid4).add(component);
+    world2[$entityComponents].get(eid5).add(component);
     if (reset)
-      resetStoreFor(component, eid4);
+      resetStoreFor(component, eid5);
   };
   var $size = Symbol("size");
   var $resizeThreshold = Symbol("resizeThreshold");
@@ -865,7 +869,7 @@
     const size = getGlobalSize();
     world2[$size] = size;
     if (world2[$entityArray])
-      world2[$entityArray].forEach((eid4) => removeEntity(world2, eid4));
+      world2[$entityArray].forEach((eid5) => removeEntity(world2, eid5));
     world2[$entityMasks] = [new Uint32Array(size)];
     world2[$entityComponents] = new Map();
     world2[$archetypes] = [];
@@ -965,38 +969,38 @@
       console.log("Creating multiple entities with all components");
       const eids = [eid];
       for (let i = 0; i < 10; i++) {
-        const eid4 = addEntity(world2);
-        addComponent(world2, ArrayComponent, eid4);
-        addComponent(world2, EntityData2, eid4);
-        addComponent(world2, TagComponent, eid4);
-        ArrayComponent.arr[eid4][5] = 3;
-        EntityData2.category[eid4] = 2;
-        EntityData2.dataID[eid4] = 3;
-        EntityData2.variant[eid4] = 1;
-        eids.push(eid4);
+        const eid5 = addEntity(world2);
+        addComponent(world2, ArrayComponent, eid5);
+        addComponent(world2, EntityData2, eid5);
+        addComponent(world2, TagComponent, eid5);
+        ArrayComponent.arr[eid5][5] = 3;
+        EntityData2.category[eid5] = 2;
+        EntityData2.dataID[eid5] = 3;
+        EntityData2.variant[eid5] = 1;
+        eids.push(eid5);
       }
       for (let i = 0; i < 10; i++) {
-        const eid4 = addEntity(world2);
-        addComponent(world2, Vector2Component, eid4);
-        addComponent(world2, EntityData2, eid4);
-        Vector2Component.value[eid4][1] = 0.8;
-        EntityData2.category[eid4] = 6;
-        EntityData2.dataID[eid4] = 7;
-        EntityData2.variant[eid4] = 3;
-        eids.push(eid4);
+        const eid5 = addEntity(world2);
+        addComponent(world2, Vector2Component, eid5);
+        addComponent(world2, EntityData2, eid5);
+        Vector2Component.value[eid5][1] = 0.8;
+        EntityData2.category[eid5] = 6;
+        EntityData2.dataID[eid5] = 7;
+        EntityData2.variant[eid5] = 3;
+        eids.push(eid5);
       }
       for (let i = 0; i < 10; i++) {
-        const eid4 = addEntity(world2);
-        addComponent(world2, Vector2Component, eid4);
-        addComponent(world2, ArrayComponent, eid4);
-        addComponent(world2, EntityData2, eid4);
-        Vector2Component.value[eid4][0] = 0.3;
-        ArrayComponent.arr[eid4][4] = 6;
-        ArrayComponent.arr[eid4][5] = 8;
-        EntityData2.category[eid4] = 19;
-        EntityData2.dataID[eid4] = 3;
-        EntityData2.variant[eid4] = 4;
-        eids.push(eid4);
+        const eid5 = addEntity(world2);
+        addComponent(world2, Vector2Component, eid5);
+        addComponent(world2, ArrayComponent, eid5);
+        addComponent(world2, EntityData2, eid5);
+        Vector2Component.value[eid5][0] = 0.3;
+        ArrayComponent.arr[eid5][4] = 6;
+        ArrayComponent.arr[eid5][5] = 8;
+        EntityData2.category[eid5] = 19;
+        EntityData2.dataID[eid5] = 3;
+        EntityData2.variant[eid5] = 4;
+        eids.push(eid5);
       }
       console.log("Serializing multiple entities with all components");
       const packet2 = serializeAll(eids);
@@ -1007,39 +1011,39 @@
       eids.length = 0;
       eids.push[eid];
       for (let i = 0; i < 10; i++) {
-        const eid4 = addEntity(world2);
-        addComponent(world2, ArrayComponent, eid4);
-        addComponent(world2, EntityData2, eid4);
-        ArrayComponent.arr[eid4][5] = 3;
-        ArrayComponent.arr[eid4][2] = 1;
-        EntityData2.category[eid4] = 2;
-        EntityData2.dataID[eid4] = 3;
-        EntityData2.variant[eid4] = 1;
-        eids.push(eid4);
+        const eid5 = addEntity(world2);
+        addComponent(world2, ArrayComponent, eid5);
+        addComponent(world2, EntityData2, eid5);
+        ArrayComponent.arr[eid5][5] = 3;
+        ArrayComponent.arr[eid5][2] = 1;
+        EntityData2.category[eid5] = 2;
+        EntityData2.dataID[eid5] = 3;
+        EntityData2.variant[eid5] = 1;
+        eids.push(eid5);
       }
       for (let i = 0; i < 10; i++) {
-        const eid4 = addEntity(world2);
-        addComponent(world2, Vector2Component, eid4);
-        addComponent(world2, EntityData2, eid4);
-        Vector2Component.value[eid4][1] = 0.8;
-        Vector2Component.value[eid4][0] = -0.5;
-        EntityData2.category[eid4] = 6;
-        EntityData2.dataID[eid4] = 7;
-        EntityData2.variant[eid4] = 3;
-        eids.push(eid4);
+        const eid5 = addEntity(world2);
+        addComponent(world2, Vector2Component, eid5);
+        addComponent(world2, EntityData2, eid5);
+        Vector2Component.value[eid5][1] = 0.8;
+        Vector2Component.value[eid5][0] = -0.5;
+        EntityData2.category[eid5] = 6;
+        EntityData2.dataID[eid5] = 7;
+        EntityData2.variant[eid5] = 3;
+        eids.push(eid5);
       }
       for (let i = 0; i < 10; i++) {
-        const eid4 = addEntity(world2);
-        addComponent(world2, Vector2Component, eid4);
-        addComponent(world2, ArrayComponent, eid4);
-        addComponent(world2, EntityData2, eid4);
-        Vector2Component.value[eid4][0] = 0.3;
-        ArrayComponent.arr[eid4][4] = 6;
-        ArrayComponent.arr[eid4][5] = 8;
-        EntityData2.category[eid4] = 19;
-        EntityData2.dataID[eid4] = 3;
-        EntityData2.variant[eid4] = 4;
-        eids.push(eid4);
+        const eid5 = addEntity(world2);
+        addComponent(world2, Vector2Component, eid5);
+        addComponent(world2, ArrayComponent, eid5);
+        addComponent(world2, EntityData2, eid5);
+        Vector2Component.value[eid5][0] = 0.3;
+        ArrayComponent.arr[eid5][4] = 6;
+        ArrayComponent.arr[eid5][5] = 8;
+        EntityData2.category[eid5] = 19;
+        EntityData2.dataID[eid5] = 3;
+        EntityData2.variant[eid5] = 4;
+        eids.push(eid5);
       }
       console.log("Serializing multiple entities with all components again");
       const packet3 = serializeAll(eids);
@@ -1091,9 +1095,14 @@
   var eid3 = addEntity(world);
   addComponent(world, Vector2Component, eid3);
   addComponent(world, ArrayComponent, eid3);
+  var eid4 = addEntity(world);
+  addComponent(world, ArrayComponent, eid4);
+  for (let i = 0; i < 1024; i++)
+    ArrayComponent.arr[eid4][i] = i + 1;
   var testChangedSerializer = (world2) => {
     try {
-      console.log("Serializing entity with changed Vector2 component");
+      Vector2Component.value[eid3][0] = 3.4;
+      console.log("Serializing entity with changed Vector2 serializer");
       const packet = serializeChangedVector2([eid3]);
       console.log(`Packet bytes: ${packet.byteLength}`);
       console.log("Deserializing packet");
@@ -1103,11 +1112,11 @@
       const packet2 = serializeChangedVector2([eid3]);
       console.log(`Packet bytes: ${packet2.byteLength} (expected 0)`);
       console.log("Changing component value");
-      Vector2Component.value[eid3][0] = 5;
+      Vector2Component.value[eid3][1] = 5;
       console.log("Serializing entity after value change");
       const packet3 = serializeChangedVector2([eid3]);
       console.log(`Packet bytes: ${packet3.byteLength}`);
-      console.log("Serializing entity with changed array component");
+      console.log("Serializing entity with changed array serializer");
       const packet4 = serializeChangedArray([eid3]);
       console.log(`Packet bytes: ${packet4.byteLength}`);
       console.log("Serializing entity after no value change");
@@ -1118,6 +1127,24 @@
       console.log("Serializing entity after value change");
       const packet6 = serializeChangedArray([eid3]);
       console.log(`Packet bytes: ${packet6.byteLength}`);
+      console.log("Serializing entity after no value change");
+      const packet7 = serializeChangedArray([eid3]);
+      console.log(`Packet bytes: ${packet7.byteLength} (expected 0)`);
+      console.log("Serialize filled array");
+      const packet9 = serializeChangedArray([eid4]);
+      console.log(`Packet bytes: ${packet9.byteLength}`);
+      console.log("Serialize filled array after no change");
+      const packet10 = serializeChangedArray([eid4]);
+      console.log(`Packet bytes: ${packet10.byteLength} (expected 0)`);
+      console.log("Run the serializer a few times for good luck");
+      serializeChangedArray([eid4]);
+      serializeChangedArray([eid4]);
+      serializeChangedArray([eid4]);
+      console.log("Change one value in filled array");
+      ArrayComponent.arr[eid4][66] = 2;
+      console.log("Serialize filled array after change along with non changed entity");
+      const packet11 = serializeChangedArray([eid4, eid3]);
+      console.log(`Packet bytes: ${packet11.byteLength}`);
     } catch (err) {
       console.error(err);
     }
@@ -1143,16 +1170,16 @@
       addComponent(world2, Position, chunkEID);
       const eids = [chunkEID];
       for (let i = 0; i < 50; i++) {
-        const eid4 = addEntity(world2);
-        addComponent(world2, Position, eid4);
-        addComponent(world2, EntityData2, eid4);
-        addComponent(world2, StaticEntity, eid4);
-        addComponent(world2, Hitpoints, eid4);
+        const eid5 = addEntity(world2);
+        addComponent(world2, Position, eid5);
+        addComponent(world2, EntityData2, eid5);
+        addComponent(world2, StaticEntity, eid5);
+        addComponent(world2, Hitpoints, eid5);
         if (Math.random() < 0.5)
-          addComponent(world2, Collider, eid4);
+          addComponent(world2, Collider, eid5);
         if (Math.random() < 0.5)
-          addComponent(world2, Door, eid4);
-        eids.push(eid4);
+          addComponent(world2, Door, eid5);
+        eids.push(eid5);
       }
       console.log("Serializing chunk entities");
       const packet = actualComponentSerializer(eids);
